@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<!--AIzaSyDu2PpYotCKcRmxgxbxhBxCR42ZLy3gqhM-->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Chatroom with Gemini API</title>
+    <style>
+        body {
+            color: white;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: #000;
+            /* Default background in case image doesn't load */
+        }
+
+        #backgroundWrapper {
+            width: 80vw;
+            /* Use viewport width units */
+            max-width: 800px;
+            /* Maximum width remains 800px */
+            height: 80vw;
+            /* Height is set to be the same in viewport width units, approximating the width */
+            max-height: 800px;
+            /* Maximum height to match the maximum width */
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            background-image: url('img/dive.jpg');
+            /* Replace with your image path */
+            background-size: contain;
+            /* Ensures the image is fully visible without stretching */
+            background-repeat: no-repeat;
+            background-position: center bottom;
+        }
+
+        #gameContainer {
+            width: 100%;
+            /* Takes the full width of the background wrapper */
+            height: 200px;
+            /* Adjusted height to position at the bottom of the image */
+            background: rgba(0, 0, 0, 0.8);
+            /* Semi-transparent black background */
+            padding: 10px;
+            display: none;
+            box-sizing: border-box;
+            border: 1px solid #fff;
+            overflow: hidden;
+        }
+
+        #messages {
+            height: 80%;
+            overflow-y: auto;
+            margin-bottom: 10px;
+        }
+
+        .message {
+            margin: 5px 0;
+        }
+
+        .userMessage {
+            color: #0f0;
+        }
+
+        .botMessage {
+            color: #ff0;
+        }
+
+        #messageInput {
+            width: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+            background: transparent;
+            border: none;
+            border-top: 1px solid #fff;
+            color: white;
+            font-size: 16px;
+        }
+
+        #startButton, #introButton {
+            padding: 15px 30px;
+            /* Increase padding for a better look */
+            font-size: 20px;
+            /* Adjust font size */
+            cursor: pointer;
+            /* Position it within the wrapper */
+            margin-bottom: 20px;
+            color: white;
+            /* Text color */
+            background: rgba(0, 0, 0, 0.8);
+            /* Same semi-transparent background as introBlock */
+            border: 1px solid #fff;
+            /* Same border as introBlock */
+            border-radius: 5px;
+            /* Rounded corners similar to introBlock */
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3);
+            /* Subtle shadow for depth */
+            transition: all 0.3s ease;
+            /* Smooth transition for hover effects */
+        }
+
+        #startButton:hover,
+        #introButton:hover {
+            background: rgba(0, 0, 0, 1);
+            /* Darker background on hover */
+            box-shadow: 0px 6px 15px rgba(0, 0, 0, 0.5);
+            /* Slightly larger shadow on hover */
+            transform: scale(1.05);
+            /* Slightly enlarge on hover */
+        }
+
+        #introBlock {
+            width: 80%;
+            max-width: 600px;
+            background: rgba(0, 0, 0, 0.8);
+            /* Semi-transparent background */
+            padding: 20px;
+            box-sizing: border-box;
+            border: 1px solid #fff;
+            margin-bottom: 20px;
+            /* Space between intro block and start button */
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            display: none;
+            /* Initially hidden */
+        }
+    </style>
+</head>
+
+<body>
+    <div id="introBlock">
+        <h2>歡迎來到《Dive back in time》</h2>
+        <p>在《Dive back in time》中，每一個選擇都將帶來不同的結果和體驗。你將扮演一位失去靈感的小説家，展開一場跨越時間的旅程。選擇沒有對錯，這是一場純粹的體驗之旅，請享受在回憶的分歧點中的各種發展。</p>
+        <button id="startButton">Start Game</button>
+    </div>
+    <div id="backgroundWrapper">
+        <button id="introButton">遊戲介紹</button>
+        <div id="gameContainer">
+            <div id="messages"></div>
+            <form id="messageForm">
+                <input type="text" id="messageInput" placeholder="Type your command...">
+            </form>
+        </div>
+    </div>
+
+</body>
+<script>
+    var conversationHistory = [];
+
+    var apiKey = prompt("Please enter your API key:", "");
+    var userName = prompt("Please enter your name:", "");
+
+    if (!apiKey || !userName) {
+        alert("API key and name are required to use the chatroom.");
+        // Optionally, redirect or disable form
+    } else {
+        document.getElementById('messageForm').addEventListener('submit', function (event) {
+            event.preventDefault();
+            var inputElement = document.getElementById('messageInput');
+            var message = inputElement.value;
+
+            addToConversationHistory('user', message);
+            displayMessage(message, 'user');
+            inputElement.disabled = true;
+            fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=' + apiKey, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    "contents": conversationHistory,
+                    "safetySettings": [
+                        {
+                            "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                            "threshold": "BLOCK_NONE"
+                        },
+                        {
+                            "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                            "threshold": "BLOCK_NONE"
+                        },
+                    ],
+                    "generationConfig": {
+                        "stopSequences": [
+                            ""
+                        ],
+                        "temperature": 1.5,
+                        "maxOutputTokens": 2048,
+                        "topP": 0.4,
+                        "topK": 10
+                    }
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    var responseText = data.candidates[0].content.parts[0].text;
+                    addToConversationHistory('model', responseText);
+                    displayMessage(responseText, 'bot');
+                    inputElement.disabled = false;
+                })
+                .catch(error => {
+                    console.error('Error:', error)
+                    inputElement.disabled = false;
+                });
+
+            document.getElementById('messageInput').value = '';
+        });
+    }
+
+    function addToConversationHistory(role, text) {
+        conversationHistory.push({
+            "role": role,
+            "parts": [{
+                "text": text
+            }]
+        });
+    }
+
+    function displayMessage(message, sender) {
+        var messageElement = document.createElement('div');
+        var formatMessage = formatText(message);
+        messageElement.classList.add('message');
+        if (sender === 'user') {
+            messageElement.classList.add('userMessage');
+        } else {
+            messageElement.classList.add('botMessage');
+        }
+        document.getElementById('messages').appendChild(messageElement);
+        updateSceneImage(message);
+        // Function to display the text one character at a time
+        function typeText(element, text, index) {
+            if (index < text.length) {
+                let char = text[index];
+                if (char === '<') {
+                    let endIndex = text.indexOf('>', index);
+                    if (endIndex !== -1) {
+                        element.innerHTML += text.substring(index, endIndex + 1);
+                        index = endIndex + 1;
+                    }
+                } else {
+                    element.innerHTML += char;
+                    index++;
+                }
+                setTimeout(function () {
+                    typeText(element, text, index);
+                }, 75); // Adjust typing speed by changing the delay (in milliseconds)
+            } else {
+                // Scroll to bottom after the entire message is displayed
+                document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+            }
+        }
+
+        // Start typing the formatted message
+        typeText(messageElement, formatMessage, 0);
+    }
+
+    function updateSceneImage(responseText) {
+        let sceneMatch = responseText.match(/場景：(.*?)\s/); // 使用正則表達式匹配場景描述
+        if (sceneMatch && sceneMatch[1]) {
+            let scene = sceneMatch[1];
+            console.log(scene);
+            // 檢查scene是否包含"宿舍"
+            if (scene.includes("書房")) {
+                document.getElementById('backgroundWrapper').style.backgroundImage = "url('img/shufang.jpg";
+            } else if (scene.includes("登山走道")) {
+                document.getElementById('backgroundWrapper').style.backgroundImage = "url('img/qianjia.jpg')";
+            } else if (scene.includes("左邊的小路")) {
+                document.getElementById('backgroundWrapper').style.backgroundImage = "url('img/shenshe.jpg')";
+            } else if (scene.includes("路上")) {
+                document.getElementById('backgroundWrapper').style.backgroundImage = "url('img/ming.jpg')";
+            } else{
+                document.getElementById('backgroundWrapper').style.backgroundImage = "url('img/dive.jpg')";
+            }
+        }
+    }
+
+    function formatText(text) {
+        // Replace ** with a new line and bold tag
+        let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<br><strong>$1</strong>');
+
+        // Replace * with a new line and bullet point
+        formattedText = formattedText.replace(/\*(.*?)\s/g, '<br>$1');
+
+        return formattedText;
+    }
+
+    document.getElementById('introButton').addEventListener('click', function () {
+        document.getElementById('introBlock').style.display = 'block';
+        this.style.display = 'none'; // Hide the intro button
+        document.getElementById('startButton').style.display = 'block'; // Show the start button
+    });
+
+    document.getElementById('startButton').addEventListener('click', function () {
+        // Change background image and display settings when starting the game
+        document.getElementById('backgroundWrapper').style.backgroundImage = "url('img/dive.jpg')";
+        document.getElementById('introBlock').style.display = 'none'; // Show the game container
+        document.getElementById('gameContainer').style.display = 'inline';
+        document.getElementById('introButton').style.display = 'none'; // Hide the start button
+
+        conversationHistory.push({
+            "role": 'user',
+            "parts": [{
+                "text": `腳本：
+                        """
+                        遊戲標題：Dive back in time
+                        遊戲背景
+                        ${userName}是一位失意的小説家，希望能透過這次的旅行找到靈感。遊戲通過${userName}的互動和選擇來探索角色的過去。
+                        
+                        遊戲設定
+                        時光并非無法重來，只要你找到方法......
+
+                        文本生成限制：
+                        請參考每個段落的選擇之前的文本進行一小段劇情拓展
+
+                        主要角色：
+                        ${userName}：主角，失意的小説家。
+                        明：${userName}回到過去遇到的人。
+                        千佳：神社的巫女。(實際上是狐仙大人，喜愛惡作劇)。
+                       
+                        遊戲腳本流程
+
+                        開場：
+                        （場景：書房）
+                        ${userName}是一位失意的小説家，已經很久沒有寫出有趣的小説的他，正在思考是否要出去旅行。（描述目前的情況）
+                        ${userName}：還是我該出門走走，順便找找靈感嗎？
+                        A：去旅行吧，散散心説不定還能找到靈感。（選擇後進入去哪呢劇情）
+                        B：不了，還是多看看最近熱門的書籍吧。（選擇後進入或許該出去看看結局）
+
+                        去哪呢：
+                        （場景：電腦前）
+                        若選擇A，${userName}決定去旅行，卻遲遲不知道該去哪。
+                         A：去大版，大版有許多我沒去過的地方、有很多美食，還有神社，我想去參拜！ （選擇後進入旅途中劇情）
+                         B：去北海道，我一直想去那邊滑雪，希望能借此冲掉心中的不快。（選擇後進入因禍得福結局）
+
+                        旅途中：
+                        （場景：神社）
+                        ${userName}來到了大阪，開始了五天四夜的旅行。
+                        在神社參拜時，${userName}卻猶豫於是否要前往山上的舊社。
+                        要不要去山上的舊社看看呢？
+                        A：既然來了那肯定要看看，何況沿途還有千本鳥居陪著我。（選擇後進入上山的岔路劇情）
+                        B：不了不了，下午還有別的行程呢，保留點體力吧。（選擇後進入白來一趟結局）
+
+                        上山的岔路：
+                        （場景：登山走道）
+                        若選擇A，${userName}在上山時遇到了岔路，在這時旁邊傳來了神社巫女千佳的聲音，千佳：“你好，我是這間神社的巫女，想要上山的話，走左邊會比較快哦！”  ${userName}看著眼前的路牌，路牌上寫著上山請走右邊的道路
+                        A：巫女小姐看起來不像什麽壞人，走左邊應該沒問題吧（選擇後進入老舊的神社劇情）
+                        B：還是跟著路牌走吧，而且大家也都是走這邊（選擇後進入旅行作家結局）
+
+                        老舊的神社：
+                        （場景：左邊的小路）
+                        若選擇A，${userName}選擇相信巫女小姐，走了左邊的路，卻在經過巫女小姐時隱約聼到了像是狐狸般的竊笑
+                        走了許久，${userName}來到了一間老舊的神社前，神社看起來已經很久沒有人來了，似乎和旅游網站上舊社的照片不太一樣
+                        要進去看看嗎？
+                        A：來都來了，進去看看吧，説不定能成爲我寫作的靈感。（選擇後進入參拜劇情）
+                        B：看起來好可怕，我還是趕緊回去吧（選擇後進入無禮之徒結局）
+                        
+                        參拜：
+                        （場景：神社内部）
+                        若選擇A，${userName}選擇進入神社本殿，參拜完後突然感到一陣疲憊
+                        要休息一下嗎
+                        A：休息一下吧，下午的行程......再説吧（選擇後進入夢迴劇情）
+                        B：走吧走吧，晚點還要去逛商店街呢（選擇後進入夕陽結局）
+
+                        夢迴:
+                        (場景：？)
+                        若選擇A，${userName}坐到庭園的長椅上，打開了手機的記事本，打算休息一下順便整理一路上的所見所聞。但專注於手機的他卻沒發現，不知何時周圍逐漸飄起了濃霧，隨著濃霧的包圍，${userName}也漸漸的昏睡在了長椅上。
+                        醒來后發現自己回到了老家，看了看日曆，2009年6月15日......似乎是什麽重要的日子
+                        A:我現在是在做夢嗎？做夢的話根據經驗，認知到現在是夢的時候差不多就快醒了吧......所以現在不是夢嗎？好混亂(選擇後進入相遇劇情)
+                        B:我現在是在做夢嗎？怎麽記得我原本是在長椅上...好累...好暈...再睡會吧（選擇後進入驚恐之旅結局）
+                        
+                        相遇：
+                        （場景：路上）
+                        若選擇A，${userName}起身后發現家裏似乎沒人，決定出門看看。走在路上，突然有個聲音從背後叫住了${userName}。轉頭一看，是從小就認識，一直到高三都是好朋友的明。
+                        明：“${userName}你怎麽在會在這裏呀，我記得你不是從來不翹社團的嗎......難道你終於開竅了？要和我一起加入回家社了？！”
+                        A：嗯...明...6月15...2009...！！（選擇後進入勸阻劇情）
+                        B：沒有啦，我只是睡過頭了，等等就去學校了，肯定又要被教練罵了（選擇後進入錯過就是錯過結局）
+
+                        勸阻：
+                        （場景：路邊）
+                        若選擇A，明看著${userName}驚恐的表情：“你怎麽一驚一乍的？沒事吧...”話還沒説完，明看了一眼手錶突然大叫：“啊啊啊啊三點半了，再不快點四點上班會遲到的，我等等還有打工就先走啦”，等${userName}回過神來，明已經騎上脚踏車離開了。雖然也有嘗試呼喊，但明已經戴上耳機聽不見他説話了，只能眼睜睜看著明逐漸消失在轉角。
+                        A：現在三點三十...從這邊騎車到他打工的地方十分鐘就到了，怎麽會遲到呢？而且爲什麽是左轉？不是該直走嗎？（選擇後進入Break the destiny結局）
+                        B：才三點半怎麽會遲到...不管了，追上去再説（選擇後進入案發現場結局）
+
+                        結局:
+                        或許該出去看看結局：${userName}沒有選擇出去旅行，整日埋首于書堆中，但隨著看的書越來越多，他的思維越來越僵化，最終寫不出有趣小説的他選擇了放棄。有機會回到過去的話，他可能會出去走走吧，可惜時光無法重來，除非......
+                        因禍得福結局：${userName}選擇去了北海道，但在滑雪的途中卻意外衝出雪道撞進樹叢中。骨折的他住進了醫院，但也因此在住院期間將自身的經歷寫成了小説《雪場奇緣》，小説出版後大受好評。但有機會回到過去的話，他可能會改去大阪吧，可惜時光無法重來，除非......
+                        白來一趟結局：雖然在大阪的旅程充滿著快樂的回憶，但似乎少了些什麽，回到東京的${userName}還是無法寫出讓自己滿意的小説。有機會回到過去的話，他可能會上山看看吧，可惜時光無法重來，除非......
+                        旅行作家結局：跟著路牌走的${userName}順利到達了山頂的舊社，順利的參拜完結束了旅程。似乎受到什麽啓發的他決定將這次旅游的所見所聞寫下，卻意外的大受好評，從此轉型成了旅行作家，在世界各地旅行著。但每當想起這段旅程，他卻總是有些疑惑：“巫女小姐爲什麽說要走左邊呢？”  後來重返大阪的他，再去到當初的岔路口，卻發現左邊的路消失了，而神社中也並沒有叫做千佳的巫女。
+                        無禮之徒結局：選擇離開的${userName}發現回去的路消失了，周圍也不知何時掀起了濃霧。隨著濃霧的包圍，${userName}感覺自己的頭腦越來越沉重，意識越來越模糊，最後倒在地上昏迷不醒。隨著${userName}的昏迷，一個模糊的身影從迷霧中走了出來，（身份不明）：“進到別人家卻不打聲招呼就走，真是沒禮貌的客人呐......罷了罷了送你回到開頭，這次別再選錯了唷~”
+                        夕陽結局：下山的路上${userName}遇見了夕陽，鳥居和鳥居之間的縫隙照進眼底的夕陽，c衝擊了他沉寂已久的心靈，也將這路途的一切化爲靈感，寫出了大受好評的日式奇幻小説《神靈與夕陽》。幾年後以參加簽書會爲由再度來到大阪的他，抽空來到了神社參拜，以感謝當初在鳥居之間的夕陽所帶給他的靈感。而當他沿著鳥居步道走到當初的岔路口時，卻發現左邊的路消失了，而神社中也并沒有叫做千佳的巫女，真正的舊社也不像他當初見到的神社那般老舊不堪，留給他的，只剩下内心無比的疑惑與恐懼......
+                        驚恐之旅結局：選擇睡回去的${userName}再次醒來后，發現自己倒在神社大殿中。迷迷糊糊醒來的他離開時看見了長椅才想起自己是在長椅上睡着的，那爲什麽會在神社内部醒來呢？想到這裏的他頓時失去了探究的心情，只想儘快遠離這個地方。回到旅館後，${userName}連夜飛回了東京，這趟旅程除了驚恐之外什麽也不剩......
+                        錯過就是錯過結局；在去學校的路上，${userName}終於想起來今天是什麽日子。2009年6月15日，下午03：25，XX縣XX區XX町，發生了一起貨車追撞事件，一名17歲高中生在該起事件中不幸身亡，目擊的民衆表示他是爲了將在路上玩球的女童推開才會被捲入事故。醒來後的${userName}發現自己在大殿，卻也無心思考這個問題，失魂落魄的離開了，嘴中喃喃道：“哪怕是在夢中...我也還是什麽都做不到...”
+                        案發現場結局：跟在身後追著單車的${userName}，只能看著脚踏車在他的眼中越來越小，自知追不上的${userName}選擇回頭趕往事發地點。但由於前面的狂奔消耗了體力，當${userName}喘著粗氣抵達現場時正好看見一顆球從他眼前划過，明棄車飛撲推開女孩仿佛慢動作般映入眼中，甚至還能看到明臉上的汗水滑落，隨後鮮血四濺，${userName}也因眼前場景造成的衝擊，昏倒在了地上。從被告知者變成了目擊者的他，回到現實仿佛失了神一般，一動不動的站在大殿中。這時巫女千佳...又或是說狐仙大人從門口走了進來：“受到的衝擊太大，有一部分的靈魂被遺留在過去了嗎...真是可憐的客人，但這種情況我也已經無能爲力了呢”
+                        Break the destiny：直走的${userName}先明一步來到了記憶中的地點，見到了正在玩球的女孩，${userName}：“要不是你...明也不會！”觸景生情的他一怒之下將女孩的球踢飛了好遠，平復了情緒後${userName}也將大哭的女孩拉去了路邊。時間來到了下午03：45，看著騎車經過眼前的明，${userName}也才真正鬆了口氣。回到家中看著新聞，記憶中的車禍沒有因爲駕駛躲閃女孩不及而發生，明也沒有爲了要救女孩而被捲入案件，吃過晚飯後，早早的上床睡覺了。醒來的${userName}發現千佳站在自己面前説道：“是你做的嗎...謝了，也算是在夢中挽回了遺憾”，千佳看著${userName}：“只是夢嗎？那可不一定哦，呼呼呼”疑惑的${userName}看了眼收到新訊息的手機，來自明的訊息：“人呢人呢人呢？不是説來大阪要找我吃飯嗎？我沒記錯時間吧？是今天吧？？怎麽打電話都不接啊？？” 看著手機的訊息${userName}困惑的開口：“你的意思是...那不是夢？這一切都是你做的？你到底是誰” 千佳指了指殿内的雕塑：“只是一個法力盡失的狐仙罷了，經過這次我應該也要陷入沉睡了，感激我的話就多來看看我吧，你能找到路的。” 離開神社的${userName}沿著來時的路走回岔路口，回頭一看卻發現岔路消失了：“我能找到路嗎...原來是這個意思” 離開大阪回到東京的他也將這次的經歷改編成了暢銷的東方風格奇幻小説《我與狐仙與她》                                                                                              彩蛋：讀完小説後的明：“我把你當兄弟，你居然想睡我？？？”，電話另一邊的${userName}：“哈哈哈哈哈，我只是稍稍修改了一下我和你説的那個故事，稍稍迎合一下市場嘛，哈哈哈哈哈哈哈哈......”
+
+
+                        
+                        請根據腳本中的對話，根據"""開場"""到"""結局"""進行，開始一個文字冒險遊戲，每一次的對話，都需要呈現以下格式與資訊：
+                        <場景>：目前故事的背景為何
+                        <描述>：當前場景的人物互動
+                        <選擇>：在每一次的對話中，你都會根據腳本給我可以選擇的動作，根據我選擇的動作繼續接下來的劇情，整體劇情會圍繞腳本發展。
+
+                        根據我的選擇進行故事就好，不要幫我做出選擇
+                        根據我的選擇進行故事就好，不要幫我做出選擇
+                        不要在進行選擇前執行後續的劇情
+                        在結局時請移除選擇和描述的部分
+                        在進入結局時不要生成新的選項，就算結局再長都只輸出設定好的結局`
+                        
+                    
+            }]
+        })
+        fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=' + apiKey, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                "contents": conversationHistory,
+                "safetySettings": [
+                    {
+                        "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                        "threshold": "BLOCK_NONE"
+                    },
+                    {
+                        "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                        "threshold": "BLOCK_NONE"
+                    },
+                ],
+                "generationConfig": {
+                    "stopSequences": [
+                        ""
+                    ],
+                    "temperature": 1.0,
+                    "maxOutputTokens": 2048,
+                    "topP": 0.4,
+                    "topK": 10
+                }
+            })
+        })
+            .then(response => response.json())
+            .then(data => {
+                console.log(conversationHistory);
+                var responseText = data.candidates[0].content.parts[0].text;
+                addToConversationHistory('model', responseText);
+                displayMessage(responseText, 'bot');
+            })
+            .catch(error => console.error('Error:', error));
+    });
+
+
+
+</script>
+
+</html>
